@@ -1,14 +1,9 @@
-import sys, os
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
-import streamlit as st
 from engine.profile_extractor import extract_profile
 from engine.market_data import get_market_snapshot
 from engine.portfolio_builder import generate_portfolio
 from engine.validators import validate_tickers, normalize_weights, check_limits
 from engine.report_generator import create_report
 from engine.prompts import PROMPT_VERSION
-
 
 
 LOGO_PATH = "assets/portiq_logo.png"
