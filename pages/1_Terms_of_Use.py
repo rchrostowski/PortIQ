@@ -1,7 +1,8 @@
 import streamlit as st
 
 st.title("Terms of Use – PortIQ")
-st.markdown("""
+st.markdown(
+    """
 _Last updated: October 2025_
 
 Welcome to **PortIQ** (“we,” “us,” “our”). By accessing or using this application (the “App”), you agree to these Terms of Use.
@@ -62,5 +63,7 @@ These Terms are governed by the laws of the State of Delaware, United States, wi
 
 ---
 
+
+)
 
 

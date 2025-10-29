@@ -1,7 +1,8 @@
 import streamlit as st
 
 st.title("Privacy Policy – PortIQ")
-st.markdown("""
+st.markdown(
+    """
 _Last updated: October 2025_
 
 This Privacy Policy explains how **PortIQ** (“we,” “us,” “our”) collects, uses, and protects limited information when you use our application (the “App”).
@@ -69,4 +70,6 @@ The updated version will be posted in the App with a revised “Last Updated” 
 
 ---
 
+
+)
 
