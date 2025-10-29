@@ -1,3 +1,10 @@
+import sys, os
+
+# Always include the folder containing this file (the repo root)
+app_dir = os.path.dirname(os.path.abspath(__file__))
+if app_dir not in sys.path:
+    sys.path.insert(0, app_dir)
+
 from engine.profile_extractor import extract_profile
 from engine.market_data import get_market_snapshot
 from engine.portfolio_builder import generate_portfolio
