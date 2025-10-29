@@ -1,43 +1,131 @@
-from datetime import datetime
-from reportlab.lib.pagesizes import letter
+# engine/report_generator.py
+import os, io, datetime, matplotlib.pyplot as plt
 from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import (
+    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
+)
+from reportlab.lib.units import inch
+from openai import OpenAI
+import tempfile
+import pandas as pd
 
-def create_report(profile: dict, portfolio: dict, filename="PortIQ_Report.pdf"):
-    doc = SimpleDocTemplate(filename, pagesize=letter)
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+def ai_generate_commentary(profile, portfolio, macro, metrics):
+    """Ask GPT to write an executive-level portfolio narrative."""
+    prompt = f"""
+    You are PortIQ, a Goldman-Sachs-level investment strategist.
+    Write a professional portfolio memo for an investment committee.
+
+    Context:
+    - Investor profile: {profile}
+    - Portfolio allocations: {portfolio.get('allocations', [])}
+    - Macro environment: {macro}
+    - Portfolio metrics: {metrics}
+
+    Format:
+    1. Executive Summary (2–3 paragraphs)
+    2. Market Environment (1–2 paragraphs)
+    3. Investment Rationale (1 paragraph per holding)
+    4. Outlook & Risk Discussion (1–2 paragraphs)
+    Keep tone analytical, concise, and data-driven.
+    """
+
+    try:
+        resp = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.4,
+        )
+        return resp.choices[0].message.content.strip()
+    except Exception as e:
+        return f"Error generating commentary: {e}"
+
+def create_allocation_chart(portfolio):
+    """Create and return a pie chart image buffer."""
+    allocs = portfolio.get("allocations", [])
+    labels = [a["ticker"] for a in allocs]
+    sizes = [a["weight"] for a in allocs]
+    fig, ax = plt.subplots(figsize=(5, 5))
+    ax.pie(sizes, labels=labels, autopct="%1.1f%%", startangle=90)
+    ax.axis("equal")
+    buf = io.BytesIO()
+    plt.savefig(buf, format="png", bbox_inches="tight")
+    buf.seek(0)
+    plt.close(fig)
+    return buf
+
+def create_report(profile, portfolio):
+    """Generate a Goldman-level investment report PDF."""
+    date_str = datetime.date.today().strftime("%B %d, %Y")
+    file_path = tempfile.mktemp(suffix="_PortIQ_Report.pdf")
+
+    # --- AI commentary ---
+    from engine.market_data import get_macro_snapshot
+    from engine.metrics import summarize_portfolio
+    macro = get_macro_snapshot()
+    metrics = summarize_portfolio(portfolio)
+    commentary = ai_generate_commentary(profile, portfolio, macro, metrics)
+
+    # --- Build PDF ---
+    doc = SimpleDocTemplate(file_path, pagesize=letter)
     styles = getSampleStyleSheet()
-    elements = []
+    styles.add(ParagraphStyle(name="Heading1", fontSize=18, leading=22, spaceAfter=14))
+    styles.add(ParagraphStyle(name="Heading2", fontSize=14, leading=18, spaceAfter=10))
+    styles.add(ParagraphStyle(name="Body", fontSize=11, leading=14))
 
-    title = Paragraph("<b>PortIQ Investment Summary</b>", styles["Title"])
-    date = Paragraph(datetime.now().strftime("%B %d, %Y"), styles["Normal"])
-    elements += [title, date, Spacer(1, 20)]
+    story = []
 
-    elements.append(Paragraph("<b>Investor Profile</b>", styles["Heading2"]))
-    for k, v in profile.items():
-        elements.append(Paragraph(f"{k}: {v}", styles["Normal"]))
-    elements.append(Spacer(1, 15))
+    # --- Cover Page ---
+    story.append(Paragraph("<b>PortIQ Investment Report</b>", styles["Heading1"]))
+    story.append(Paragraph(f"Date: {date_str}", styles["Body"]))
+    story.append(Paragraph("Confidential — For Client Use Only", styles["Body"]))
+    story.append(Spacer(1, 0.4 * inch))
 
-    elements.append(Paragraph("<b>Recommended Portfolio</b>", styles["Heading2"]))
-    data = [["Ticker", "Weight", "Rationale"]] + [
-        [a["ticker"], f"{a['weight']*100:.1f}%", a["reason"]] for a in portfolio["allocations"]
-    ]
-    table = Table(data, colWidths=[80, 80, 350])
+    # --- Investor Profile Summary ---
+    story.append(Paragraph("<b>Investor Profile</b>", styles["Heading2"]))
+    story.append(Paragraph(str(profile).replace("{","").replace("}",""), styles["Body"]))
+    story.append(Spacer(1, 0.3 * inch))
+
+    # --- Portfolio Allocation Chart ---
+    buf = create_allocation_chart(portfolio)
+    story.append(Image(buf, width=4*inch, height=4*inch))
+    story.append(Spacer(1, 0.3 * inch))
+
+    # --- Allocation Table ---
+    story.append(Paragraph("<b>Portfolio Allocation</b>", styles["Heading2"]))
+    allocs = portfolio.get("allocations", [])
+    table_data = [["Ticker", "Weight", "Reason"]]
+    for a in allocs:
+        table_data.append([a["ticker"], f"{a['weight']*100:.1f}%", a.get("reason", "")])
+
+    table = Table(table_data, colWidths=[1.2*inch, 1*inch, 3.3*inch])
     table.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#244B9A")),
-        ('TEXTCOLOR', (0,0), (-1,0), colors.white),
-        ('GRID', (0,0), (-1,-1), 0.25, colors.grey),
-        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold')
+        ("BACKGROUND", (0,0), (-1,0), colors.HexColor("#003366")),
+        ("TEXTCOLOR", (0,0), (-1,0), colors.white),
+        ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
+        ("ALIGN", (1,1), (1,-1), "CENTER"),
+        ("GRID", (0,0), (-1,-1), 0.25, colors.grey),
+        ("ROWBACKGROUNDS", (0,1), (-1,-1), [colors.whitesmoke, colors.lightgrey]),
     ]))
-    elements.append(table)
-    elements.append(Spacer(1, 20))
+    story.append(table)
+    story.append(Spacer(1, 0.4 * inch))
 
-    disclaimer = Paragraph(
-        "Educational use only. Not investment advice. "
-        "PortIQ is not a broker/dealer or investment adviser.",
-        styles["Italic"]
-    )
-    elements.append(disclaimer)
+    # --- AI Commentary Sections ---
+    story.append(Paragraph("<b>Investment Committee Commentary</b>", styles["Heading2"]))
+    for para in commentary.split("\n\n"):
+        story.append(Paragraph(para.strip(), styles["Body"]))
+        story.append(Spacer(1, 0.15 * inch))
 
-    doc.build(elements)
-    return filename
+    # --- Footer Disclaimer ---
+    story.append(Spacer(1, 0.5 * inch))
+    story.append(Paragraph(
+        "This report is generated by PortIQ AI. It is intended for educational and illustrative "
+        "purposes only and does not constitute investment advice, solicitation, or offer to buy/sell securities.",
+        styles["Body"]
+    ))
+
+    doc.build(story)
+    return file_path
