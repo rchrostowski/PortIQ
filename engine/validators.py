@@ -1,54 +1,36 @@
-import yfinance as yf
+import pandas as pd
 
-def validate_tickers(portfolio: dict):
-    """
-    Validate tickers by checking if price history is available.
-    If a ticker returns empty history, it's treated as invalid.
-    """
-    allocations = portfolio.get("allocations", [])
-    valid, invalid = [], []
-
-    for a in allocations:
-        t = a.get("ticker", "").upper().strip()
-        try:
-            data = yf.Ticker(t).history(period="1d")
-            if data.empty:
-                invalid.append(t)
-            else:
-                a["ticker"] = t
-                valid.append(a)
-        except Exception:
-            invalid.append(t)
-
-    return valid, invalid
-
-
-def normalize_weights(portfolio: dict):
-    """
-    Ensures portfolio weights sum to 1.
-    """
+def normalize_weights(portfolio):
+    """Ensure weights sum to 1.0"""
     allocs = portfolio.get("allocations", [])
-    total = sum(a.get("weight", 0) for a in allocs)
-    if total <= 0:
+    total = sum(a["weight"] for a in allocs)
+    if total == 0:
         return portfolio
     for a in allocs:
-        a["weight"] = round(a["weight"] / total, 4)
+        a["weight"] = a["weight"] / total
+    portfolio["allocations"] = allocs
     return portfolio
 
+def validate_tickers(portfolio):
+    """Separate valid and invalid tickers (naive placeholder)."""
+    valid, invalid = [], []
+    for a in portfolio.get("allocations", []):
+        if isinstance(a["ticker"], str) and len(a["ticker"]) <= 5:
+            valid.append(a)
+        else:
+            invalid.append(a)
+    return valid, [a["ticker"] for a in invalid]
 
-def check_limits(portfolio: dict):
-    """
-    Detects over-concentration or exposure risks.
-    """
+def check_limits(portfolio):
+    """Return warnings about concentration and exposure."""
     allocs = portfolio.get("allocations", [])
-    weights = sorted([a["weight"] for a in allocs if "weight" in a], reverse=True)
     alerts = []
-
-    if any(w > 0.25 for w in weights):
+    if not allocs:
+        return alerts
+    weights = [a["weight"] for a in allocs]
+    weights.sort(reverse=True)
+    if max(weights) > 0.25:
         alerts.append("⚠️ Single-name exposure exceeds 25%.")
     if sum(weights[:3]) > 0.60:
-        alerts.append(f"⚠️ Top-3 concentration {round(sum(weights[:3])*100,1)}% > 60%.")
-    if len(allocs) < 4:
-        alerts.append("⚠️ Portfolio not diversified (fewer than 4 holdings).")
-
+        alerts.append(f"⚠️ Top-3 concentration {sum(weights[:3])*100:.1f}% > 60%.")
     return alerts
