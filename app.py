@@ -1,4 +1,4 @@
-import sys, os, json
+import sys, os, json, uuid, datetime, pathlib
 import streamlit as st
 import matplotlib.pyplot as plt
 
@@ -9,14 +9,23 @@ if app_dir not in sys.path:
 
 # --- ENGINE IMPORTS ---
 from engine.profile_extractor import extract_profile
-from engine.market_data import get_market_snapshot
+from engine.market_data import get_market_snapshot, get_macro_snapshot
 from engine.portfolio_builder import generate_portfolio
 from engine.validators import validate_tickers, normalize_weights, check_limits
 from engine.report_generator import create_report
 from engine.prompts import PROMPT_VERSION
+from engine.metrics import summarize_portfolio
 
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="PortIQ", page_icon="📈", layout="centered")
+
+# --- SIDEBAR NAV ---
+st.sidebar.title("Navigation")
+st.sidebar.markdown("[🏠 Home](./)")
+st.sidebar.markdown("[📄 Terms of Use](./1_Terms_of_Use)")
+st.sidebar.markdown("[🔒 Privacy Policy](./2_Privacy_Policy)")
+st.sidebar.markdown("---")
+st.sidebar.info("PortIQ v0.2 · Educational use only")
 
 # --- HEADER ---
 LOGO_PATH = "assets/portiq_logo.png"
@@ -27,7 +36,7 @@ st.warning("⚠️ Educational use only — not investment advice.")
 st.caption("Portfolio Intelligence, Built from You.")
 st.markdown("---")
 
-# --- USER INPUT CONTROLS ---
+# --- INPUT CONTROLS ---
 st.subheader("Set Your Investment Preferences")
 
 col1, col2 = st.columns(2)
@@ -50,7 +59,6 @@ story = st.text_area(
     height=140,
 )
 
-# Append structured inputs to story
 story = (
     story
     + f"\n\nRisk tolerance: {risk}/10."
@@ -60,13 +68,12 @@ story = (
 
 st.markdown("---")
 
-# --- MAIN ACTION ---
+# --- GENERATE BUTTON ---
 if st.button("🚀 Generate Portfolio", use_container_width=True):
     if not story.strip():
         st.error("Please enter your investing story first.")
         st.stop()
 
-    # Progress indicator
     progress_text = "Starting analysis..."
     progress_bar = st.progress(0, text=progress_text)
 
@@ -77,19 +84,24 @@ if st.button("🚀 Generate Portfolio", use_container_width=True):
         progress_bar.progress(50, text="Fetching market data...")
         market = get_market_snapshot()
 
-        progress_bar.progress(80, text="Generating portfolio...")
+        progress_bar.progress(70, text="Generating portfolio...")
         portfolio = generate_portfolio(profile, market)
 
-        # --- VALIDATION ---
         portfolio = normalize_weights(portfolio)
         valid, invalid = validate_tickers(portfolio)
         portfolio["allocations"] = valid
         alerts = check_limits(portfolio)
 
+        progress_bar.progress(90, text="Calculating metrics...")
+        metrics = summarize_portfolio(portfolio)
+        macro = get_macro_snapshot()
+
         progress_bar.progress(100, text="Done!")
 
-        # --- RESULTS ---
         st.success("✅ Portfolio generated successfully!")
+        run_id = str(uuid.uuid4())[:8]
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+        st.caption(f"Run ID: {run_id} · Generated {timestamp}")
         st.write("Prompt version:", PROMPT_VERSION)
 
         st.subheader("Investor Profile")
@@ -106,6 +118,13 @@ if st.button("🚀 Generate Portfolio", use_container_width=True):
             ax.axis("equal")
             st.pyplot(fig)
 
+        if metrics:
+            st.subheader("Portfolio Metrics")
+            st.table(metrics.items())
+
+        st.subheader("Macro Context")
+        st.json(macro)
+
         if invalid:
             st.error(f"Invalid tickers removed: {invalid}")
         for a in alerts:
@@ -115,9 +134,25 @@ if st.button("🚀 Generate Portfolio", use_container_width=True):
         with open(pdf_path, "rb") as f:
             st.download_button("📄 Download PDF", f, file_name="PortIQ_Report.pdf")
 
+        if st.button("🔁 Regenerate with Same Inputs", use_container_width=True):
+            st.experimental_rerun()
+
+        # --- LOGGING ---
+        pathlib.Path("logs").mkdir(exist_ok=True)
+        log = {
+            "run_id": run_id,
+            "timestamp": timestamp,
+            "profile": profile,
+            "portfolio": portfolio,
+            "metrics": metrics,
+            "macro": macro,
+        }
+        with open(f"logs/{run_id}.json", "w") as f:
+            json.dump(log, f)
+
 st.markdown("---")
 
-# --- DELETE DATA ---
+# --- DELETE DATA BUTTON ---
 if st.button("🗑️ Delete my data for this session", use_container_width=True):
     st.session_state.clear()
     st.success("All session data cleared from memory.")

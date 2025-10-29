@@ -32,3 +32,17 @@ def get_market_snapshot(tickers=None) -> dict:
         except Exception:
             continue
     return prices or {"error": "All tickers failed."}
+import requests, datetime
+
+@st.cache_data(ttl=3600)
+def get_macro_snapshot():
+    """Get a minimal macro snapshot (CPI YoY)."""
+    try:
+        data = requests.get(
+            "https://api.bls.gov/publicAPI/v2/timeseries/data/CUUR0000SA0?latest=1"
+        ).json()
+        cpi = data["Results"]["series"][0]["data"][0]["value"]
+    except Exception:
+        cpi = "N/A"
+    today = datetime.date.today().strftime("%B %d, %Y")
+    return {"Date": today, "CPI YoY": cpi}
