@@ -63,7 +63,8 @@ These Terms are governed by the laws of the State of Delaware, United States, wi
 
 ---
 
-
+If you have questions about these Terms, contact us at **support@portiq.ai**.
+"""
 )
 
 

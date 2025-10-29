@@ -70,6 +70,10 @@ The updated version will be posted in the App with a revised “Last Updated” 
 
 ---
 
-
+### 9. Contact
+Questions about this Policy or your data?  
+Email **privacy@portiq.ai**.
+"""
 )
+
 
