@@ -4,7 +4,7 @@ def validate_tickers(portfolio: dict):
     allocations = portfolio.get("allocations", [])
     valid, invalid = [], []
     for a in allocations:
-        t = a.get("ticker","").upper()
+        t = a.get("ticker", "").upper()
         try:
             info = yf.Ticker(t).info
             if info.get("shortName"):

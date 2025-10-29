@@ -1,36 +1,23 @@
 from openai import OpenAI
 import os, json, re
-from dotenv import load_dotenv
-import importlib.util, os, sys
-app_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if app_root not in sys.path:
-    sys.path.append(app_root)
-
-spec = importlib.util.find_spec("engine.prompts")
-if spec is None:
-    raise ImportError(f"Cannot find engine.prompts in {sys.path}")
 from engine.prompts import PORTFOLIO_PROMPT
 
-
-load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 FALLBACK_PORTFOLIO = {
     "allocations": [
-        {"ticker": "SPY", "weight": 0.40, "reason": "Broad U.S. market exposure"},
-        {"ticker": "QQQ", "weight": 0.25, "reason": "Tech growth exposure"},
+        {"ticker": "SPY", "weight": 0.4, "reason": "Broad U.S. market exposure"},
+        {"ticker": "QQQ", "weight": 0.25, "reason": "Tech sector growth"},
         {"ticker": "VOO", "weight": 0.15, "reason": "Low-cost S&P 500 ETF"},
-        {"ticker": "TLT", "weight": 0.10, "reason": "Treasury bond diversification"},
-        {"ticker": "XLE", "weight": 0.10, "reason": "Energy sector balance"},
+        {"ticker": "TLT", "weight": 0.1, "reason": "Bond diversification"},
+        {"ticker": "XLE", "weight": 0.1, "reason": "Energy sector balance"},
     ]
 }
 
-def clean_json(text: str):
-    """Extract JSON from possibly messy model output."""
+def _extract_json(text):
     try:
         return json.loads(text)
     except Exception:
-        # Try to extract JSON substring with regex
         match = re.search(r"\{.*\}", text, re.S)
         if match:
             try:
@@ -44,24 +31,23 @@ def generate_portfolio(profile: dict, market: dict) -> dict:
         PORTFOLIO_PROMPT
         + "\n\nInvestor profile:\n"
         + json.dumps(profile, indent=2)
-        + "\n\nMarket data snapshot:\n"
+        + "\n\nMarket snapshot:\n"
         + json.dumps(market, indent=2)
-        + "\n\nReturn ONLY valid JSON strictly following the format."
+        + "\n\nReturn ONLY valid JSON."
     )
 
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.25
+            temperature=0.25,
         )
         text = response.choices[0].message.content.strip()
-        portfolio = clean_json(text)
-
-        # guarantee allocations exist
-        if "allocations" not in portfolio or not portfolio["allocations"]:
+        portfolio = _extract_json(text)
+        if not portfolio.get("allocations"):
             return FALLBACK_PORTFOLIO
         return portfolio
     except Exception as e:
-        print("LLM call failed:", e)
+        print("Portfolio generation failed:", e)
         return FALLBACK_PORTFOLIO
+

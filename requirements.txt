@@ -1,7 +1,7 @@
 streamlit
-openai
+openai>=1.0.0
 yfinance
 pandas
-python-dotenv
 reportlab
 matplotlib
+python-dotenv
