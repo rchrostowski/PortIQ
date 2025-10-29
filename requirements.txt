@@ -1,9 +1,10 @@
 streamlit
-openai>=1.0.0
-yfinance
 pandas
-reportlab
+numpy
 matplotlib
-python-dotenv
-requests
+yfinance
+scikit-learn
+cvxpy
+reportlab
 lxml
+requests
