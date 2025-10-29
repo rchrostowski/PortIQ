@@ -25,7 +25,7 @@ st.sidebar.page_link("app.py", label="🏠 Home")
 st.sidebar.page_link("pages/1_Terms_of_Use.py", label="📄 Terms of Use")
 st.sidebar.page_link("pages/2_Privacy_Policy.py", label="🔒 Privacy Policy")
 st.sidebar.markdown("---")
-st.sidebar.info("PortIQ v0.2 · Educational use only")
+st.sidebar.info("PortIQ v0.3 · Educational use only")
 
 # --- HEADER ---
 LOGO_PATH = "assets/portiq_logo.png"
@@ -76,7 +76,6 @@ if st.button("🚀 Generate Portfolio", use_container_width=True):
         st.error("Please enter your investing story first.")
         st.stop()
 
-    # Progress indicator
     progress_text = "Starting analysis..."
     progress_bar = st.progress(0, text=progress_text)
 
@@ -129,6 +128,10 @@ if st.button("🚀 Generate Portfolio", use_container_width=True):
 
         st.subheader("Macro Context")
         st.json(macro)
+
+        if "critique" in portfolio:
+            st.subheader("AI Portfolio Review")
+            st.markdown(portfolio["critique"])
 
         if invalid:
             st.error(f"Invalid tickers removed: {invalid}")
