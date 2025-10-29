@@ -19,11 +19,11 @@ from engine.metrics import summarize_portfolio
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="PortIQ", page_icon="📈", layout="centered")
 
-# --- SIDEBAR NAV ---
+# --- SIDEBAR NAVIGATION ---
 st.sidebar.title("Navigation")
-st.sidebar.markdown("[🏠 Home](./)")
-st.sidebar.markdown("[📄 Terms of Use](./1_Terms_of_Use)")
-st.sidebar.markdown("[🔒 Privacy Policy](./2_Privacy_Policy)")
+st.sidebar.page_link("app.py", label="🏠 Home")
+st.sidebar.page_link("pages/1_Terms_of_Use.py", label="📄 Terms of Use")
+st.sidebar.page_link("pages/2_Privacy_Policy.py", label="🔒 Privacy Policy")
 st.sidebar.markdown("---")
 st.sidebar.info("PortIQ v0.2 · Educational use only")
 
@@ -31,12 +31,13 @@ st.sidebar.info("PortIQ v0.2 · Educational use only")
 LOGO_PATH = "assets/portiq_logo.png"
 if os.path.exists(LOGO_PATH):
     st.image(LOGO_PATH, width=160)
+
 st.title("PortIQ")
 st.warning("⚠️ Educational use only — not investment advice.")
 st.caption("Portfolio Intelligence, Built from You.")
 st.markdown("---")
 
-# --- INPUT CONTROLS ---
+# --- USER INPUT CONTROLS ---
 st.subheader("Set Your Investment Preferences")
 
 col1, col2 = st.columns(2)
@@ -59,6 +60,7 @@ story = st.text_area(
     height=140,
 )
 
+# Combine structured inputs into one narrative
 story = (
     story
     + f"\n\nRisk tolerance: {risk}/10."
@@ -68,12 +70,13 @@ story = (
 
 st.markdown("---")
 
-# --- GENERATE BUTTON ---
+# --- MAIN GENERATION LOGIC ---
 if st.button("🚀 Generate Portfolio", use_container_width=True):
     if not story.strip():
         st.error("Please enter your investing story first.")
         st.stop()
 
+    # Progress indicator
     progress_text = "Starting analysis..."
     progress_bar = st.progress(0, text=progress_text)
 
@@ -87,17 +90,19 @@ if st.button("🚀 Generate Portfolio", use_container_width=True):
         progress_bar.progress(70, text="Generating portfolio...")
         portfolio = generate_portfolio(profile, market)
 
+        # --- VALIDATION ---
         portfolio = normalize_weights(portfolio)
         valid, invalid = validate_tickers(portfolio)
         portfolio["allocations"] = valid
         alerts = check_limits(portfolio)
 
-        progress_bar.progress(90, text="Calculating metrics...")
+        progress_bar.progress(90, text="Calculating metrics & macro data...")
         metrics = summarize_portfolio(portfolio)
         macro = get_macro_snapshot()
 
         progress_bar.progress(100, text="Done!")
 
+        # --- DISPLAY RESULTS ---
         st.success("✅ Portfolio generated successfully!")
         run_id = str(uuid.uuid4())[:8]
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -130,10 +135,12 @@ if st.button("🚀 Generate Portfolio", use_container_width=True):
         for a in alerts:
             st.warning(a)
 
+        # --- PDF DOWNLOAD ---
         pdf_path = create_report(profile, portfolio)
         with open(pdf_path, "rb") as f:
             st.download_button("📄 Download PDF", f, file_name="PortIQ_Report.pdf")
 
+        # --- REGENERATE BUTTON ---
         if st.button("🔁 Regenerate with Same Inputs", use_container_width=True):
             st.experimental_rerun()
 
@@ -152,7 +159,7 @@ if st.button("🚀 Generate Portfolio", use_container_width=True):
 
 st.markdown("---")
 
-# --- DELETE DATA BUTTON ---
+# --- DELETE SESSION DATA ---
 if st.button("🗑️ Delete my data for this session", use_container_width=True):
     st.session_state.clear()
     st.success("All session data cleared from memory.")
@@ -163,8 +170,8 @@ st.info(
     "No investment recommendations or brokerage services are provided."
 )
 st.write(
-    "© PortIQ 2025 — Educational use only. [Terms of Use](./1_Terms_of_Use) | [Privacy Policy](./2_Privacy_Policy)"
+    "© PortIQ 2025 — Educational use only. "
+    "[Terms of Use](./1_Terms_of_Use) | [Privacy Policy](./2_Privacy_Policy)"
 )
-
 
 
